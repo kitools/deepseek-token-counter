@@ -50,6 +50,7 @@ const AppToolView = defineComponent({
               vnd(ToolButton, { label: "分析", icon: "pi pi-play", class: "mr-1.5rem",
                 onClick: async () => {
                   await deepseek_tokenizer_encode(demoData.input).then((res) => {
+                    console.log(res);
                     demoData.output = res;
                   }
                   ).catch((err) => {
@@ -60,7 +61,7 @@ const AppToolView = defineComponent({
               }),
             ]),
 
-            vnd("pre", { class: "w-full max-h-50vh p-panel p-1rem overflow-auto" }, demoData.output),
+            vnd("pre", { class: "w-full max-h-50vh p-panel p-1rem overflow-auto" }, String(demoData.output)),
 
             vnd("div", {class: "stack-h"}, []),
           ]),
