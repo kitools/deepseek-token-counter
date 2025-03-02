@@ -13,27 +13,51 @@
 
 
 
-import { AutoTokenizer, PreTrainedTokenizer } from '@huggingface/transformers';
-
+// import { AutoTokenizer, PreTrainedTokenizer } from '@huggingface/transformers';
 // https://github.com/lenML/tokenizers
 
-import tokenizerJSON from "@utils/deepseek_v3_tokenizer/tokenizer.json"
-import tokenizerConfig from "@utils/deepseek_v3_tokenizer/tokenizer_config.json"
 
-console.log({tokenizerJSON, tokenizerConfig});
 
-const tokenizerName = tokenizerConfig?.tokenizer_class?.replace(/Fast$/, '') ?? 'PreTrainedTokenizer';
 
-let cls = AutoTokenizer.TOKENIZER_CLASS_MAPPING[tokenizerName as keyof typeof AutoTokenizer.TOKENIZER_CLASS_MAPPING];
-if (!cls) {
-  console.warn(`Unknown tokenizer class "${tokenizerName}", attempting to construct from base class.`);
-  cls = PreTrainedTokenizer;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function load_deepseek_tokenizer(wrapper: {tokenizerJSON: any, tokenizerConfig: any}) {
+
+  const tokenizerJSON = await import("@utils/deepseek_v3_tokenizer/tokenizer.json");
+  const tokenizerConfig = await import("@utils/deepseek_v3_tokenizer/tokenizer_config.json");
+
+  wrapper.tokenizerJSON = tokenizerJSON;
+  wrapper.tokenizerConfig = tokenizerConfig;
+
+  console.log({tokenizerJSON, tokenizerConfig});
+
+  return wrapper;
 }
 
-const tokenizer = new cls(tokenizerJSON, tokenizerConfig);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function initialize_deepseek_tokenizer(wrapper: {tokenizerJSON: any, tokenizerConfig: any, tokenizer: any}) {
 
-export async function deepseek_tokenizer_encode(text: string) {
-  const result = tokenizer.encode(text);
+  const tokenizerJSON = wrapper.tokenizerJSON;
+  const tokenizerConfig = wrapper.tokenizerConfig;
+
+  const tokenizerName = tokenizerConfig?.tokenizer_class?.replace(/Fast$/, '') ?? 'PreTrainedTokenizer';
+
+  const { AutoTokenizer, PreTrainedTokenizer } = await import("@huggingface/transformers");
+
+  let cls = AutoTokenizer.TOKENIZER_CLASS_MAPPING[tokenizerName as keyof typeof AutoTokenizer.TOKENIZER_CLASS_MAPPING];
+  if (!cls) {
+    console.warn(`Unknown tokenizer class "${tokenizerName}", attempting to construct from base class.`);
+    cls = PreTrainedTokenizer;
+  }
+
+  const tokenizer = new cls(tokenizerJSON, tokenizerConfig);
+  wrapper.tokenizer = tokenizer;
+  return tokenizer;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function deepseek_tokenizer_encode(tokenizer: any, text: string) {
+  const result = tokenizer?.encode?.(text);
   return result;
 }
 

@@ -7,7 +7,7 @@ import {
   reactive,
 } from 'vue';
 
-import { deepseek_tokenizer_encode } from '@utils/functions';
+import { deepseek_tokenizer_encode, load_deepseek_tokenizer, initialize_deepseek_tokenizer } from '@utils/functions';
 
 import Panel from 'primevue/panel';
 import Textarea from 'primevue/textarea';
@@ -30,6 +30,14 @@ const AppToolView = defineComponent({
       processing: false,
       output: [] as number[],
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tokenizerJSON: null as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tokenizerConfig: null as any,
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tokenizer: null as any,
+
     });
 
     return ()=>{
@@ -46,17 +54,34 @@ const AppToolView = defineComponent({
               disabled: demoData.processing,
             }),
 
+            !(demoData.tokenizer!=null)?null:
             vnd("div", {class: "stack-h"}, [
               vnd(ToolButton, { label: "分析", icon: "pi pi-play", class: "mr-1.5rem",
                 onClick: async () => {
-                  await deepseek_tokenizer_encode(demoData.input).then((res) => {
+                  await deepseek_tokenizer_encode(demoData.tokenizer, demoData.input).then((res) => {
                     console.log(res);
                     demoData.output = res;
-                  }
-                  ).catch((err) => {
+                  }).catch((err) => {
                     console.error(err);
-                  }
-                  );
+                  });
+                },
+              }),
+            ]),
+
+            !(demoData.tokenizer==null&&(demoData.tokenizerJSON!=null&&demoData.tokenizerConfig!=null))?null:
+            vnd("div", {class: "stack-h"}, [
+              vnd(ToolButton, { label: "初始化", icon: "pi pi-cog", class: "mr-1.5rem",
+                onClick: async () => {
+                  await initialize_deepseek_tokenizer(demoData);
+                },
+              }),
+            ]),
+
+            !(demoData.tokenizerJSON==null||demoData.tokenizerConfig==null)?null:
+            vnd("div", {class: "stack-h"}, [
+              vnd(ToolButton, { label: "加载", icon: "pi pi-cog", class: "mr-1.5rem",
+                onClick: async () => {
+                  await load_deepseek_tokenizer(demoData);
                 },
               }),
             ]),
