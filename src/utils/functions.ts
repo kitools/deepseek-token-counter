@@ -1,24 +1,7 @@
-// # pip3 install transformers
-// # python3 deepseek_tokenizer.py
-// import transformers
 
-// chat_tokenizer_dir = "./"
-
-// tokenizer = transformers.AutoTokenizer.from_pretrained( 
-//         chat_tokenizer_dir, trust_remote_code=True
-//         )
-
-// result = tokenizer.encode("Hello!")
-// print(result)
-
-
-
-// import { AutoTokenizer, PreTrainedTokenizer } from '@huggingface/transformers';
 // https://github.com/lenML/tokenizers
 
-
-
-
+import _ from 'lodash';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function load_deepseek_tokenizer(wrapper: {tokenizerJSON: any, tokenizerConfig: any}) {
@@ -56,8 +39,12 @@ export async function initialize_deepseek_tokenizer(wrapper: {tokenizerJSON: any
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function deepseek_tokenizer_encode(tokenizer: any, text: string) {
-  const result = tokenizer?.encode?.(text);
-  return result;
+export async function deepseek_tokenizer_encode(
+  tokenizer: Awaited<ReturnType<typeof initialize_deepseek_tokenizer>>,
+  text: string,
+) {
+  const codes = tokenizer?.encode?.(text);
+  const fragments = codes.map(dd=>tokenizer.decode([dd]));
+  return _.zip(codes, fragments);
 }
 
