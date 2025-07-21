@@ -6,7 +6,7 @@ import localforage from "localforage";
 import {
   h as vnd, defineComponent,
   reactive,
-  // computed,
+  computed,
   onMounted,
 } from 'vue';
 
@@ -22,9 +22,20 @@ import ToolButton from '@components/shared/ToolButton';
 
 export const MyWordTagSpan = defineComponent({
   name: "MyWordTagSpan",
-  props: ["word", "tag", "translate"],
+  props: ["word", "tag", "translate", "showBlank"],
   setup(props) {
     // const finalTag = computed(()=>props.tag);
+
+    const displayWord = computed(()=>
+      props?.showBlank
+      ?
+      (props.word??"")
+      .replace(/\t/g, "→")
+      .replace(/\n|\r\n/g, "↵")
+      .replace(/\s/g, "␣")
+      :
+      props.word
+    );
 
     return ()=>{
       const make = ()=> vnd("span", {
@@ -34,11 +45,11 @@ export const MyWordTagSpan = defineComponent({
         class: [
           "inline-block border rounded px-0.2rem py-0.05rem m-0.1rem",
         ],
-        title: `${props.word??""}\n${props.tag??""}`,
+        title: `${displayWord.value??""}\n${props.tag??""}`,
         "data-tag": props.tag,
         "data-translate": props.translate,
       }, [
-        !props?.translate?.length ? props.word : vnd("ruby", {}, [props.word, vnd("rt", {class: "--fw-bold --text-shadow-md"}, props.translate)]),
+        !props?.translate?.length ? displayWord.value : vnd("ruby", {}, [displayWord.value, vnd("rt", {class: "--fw-bold --text-shadow-md"}, props.translate)]),
         // props?.tag==null?null:[" ", vnd("span", {class: ["opacity-50"]}, finalTag.value)],
       ]);
 
@@ -151,7 +162,12 @@ const AppToolView = defineComponent({
               demoData.output.map((item, index) => vnd(MyWordTagSpan, {
                 word: item[1], tag: `${item[0]}`,
                 key: `item-${index}-${item[1]}-${item[0]}`,
+                showBlank: true,
               })),
+            ]),
+
+            vnd("div", { class: "w-full max-h-50vh p-panel p-1rem overflow-auto" }, [
+              vnd("pre", { class: "text-xs" }, [demoData.input??""]),
             ]),
 
           ]),
