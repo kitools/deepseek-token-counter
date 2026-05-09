@@ -4,12 +4,20 @@ import {
   h as vnd, defineComponent,
   reactive,
   ref,
+  onMounted,
 } from 'vue';
 
 import Panel from 'primevue/panel';
+import Card from 'primevue/card';
 import InputText from 'primevue/inputtext';
 import Button from 'primevue/button';
 import Tag from 'primevue/tag';
+import Badge from 'primevue/badge';
+import Message from 'primevue/message';
+import Skeleton from 'primevue/skeleton';
+import Toolbar from 'primevue/toolbar';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
 import { useToast } from 'primevue/usetoast';
 import { useApiKeysStore } from '@stores/apiKeysStore';
 import { storeToRefs } from 'pinia';
@@ -41,6 +49,29 @@ const AppKeyBalanceView = defineComponent({
     const newKey = ref('');
     const balanceResults = reactive<Record<number, BalanceResult>>({});
 
+    // Load persisted results on mount
+    onMounted(() => {
+      for (const entry of keys.value) {
+        if (entry.lastBalanceResult) {
+          balanceResults[entry.id] = {
+            is_available: entry.lastBalanceResult.is_available,
+            balance_infos: entry.lastBalanceResult.balance_infos,
+            error: entry.lastBalanceResult.error,
+            loading: false,
+          };
+        }
+      }
+    });
+
+    const copyKey = async (key: string) => {
+      try {
+        await navigator.clipboard.writeText(key);
+        toast.add({ severity: 'success', summary: '已复制', detail: 'API Key 已复制到剪贴板', life: 2000 });
+      } catch {
+        toast.add({ severity: 'error', summary: '复制失败', detail: '无法访问剪贴板', life: 3000 });
+      }
+    };
+
     const queryBalance = async (entry: ApiKeyEntry) => {
       balanceResults[entry.id] = { is_available: false, balance_infos: [], loading: true };
       try {
@@ -55,11 +86,18 @@ const AppKeyBalanceView = defineComponent({
           throw new Error(`HTTP ${response.status}: ${errBody}`);
         }
         const data = await response.json();
-        balanceResults[entry.id] = {
+        const result: BalanceResult = {
           is_available: data.is_available,
           balance_infos: data.balance_infos || [],
           loading: false,
         };
+        balanceResults[entry.id] = result;
+
+        entry.lastBalanceResult = {
+          is_available: data.is_available,
+          balance_infos: data.balance_infos || [],
+        };
+        entry.lastQueryTime = Date.now();
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         balanceResults[entry.id] = {
@@ -68,6 +106,14 @@ const AppKeyBalanceView = defineComponent({
           loading: false,
           error: message,
         };
+
+        entry.lastBalanceResult = {
+          is_available: false,
+          balance_infos: [],
+          error: message,
+        };
+        entry.lastQueryTime = Date.now();
+
         toast.add({ severity: 'error', summary: '查询失败', detail: message, life: 5000 });
       }
     };
@@ -96,106 +142,154 @@ const AppKeyBalanceView = defineComponent({
       }
     };
 
+    const renderBalanceCard = (result: BalanceResult) => {
+      if (result.loading) {
+        return vnd('div', { class: 'flex flex-col gap-2' }, [
+          vnd(Skeleton, { width: '60%', height: '1rem' }),
+          vnd(Skeleton, { width: '40%', height: '1rem' }),
+          vnd(Skeleton, { width: '50%', height: '1rem' }),
+        ]);
+      }
+      if (result.error) {
+        return vnd(Message, { severity: 'error' }, {
+          default: () => `查询失败: ${result.error}`,
+        });
+      }
+
+      return vnd('div', { class: 'flex flex-col gap-3 surface-ground border-round p-3' }, [
+        vnd('div', { class: 'flex flex-row flex-items-center gap-2' }, [
+          vnd('span', { class: '' }, '账户状态:'),
+          vnd(Tag, {
+            value: result.is_available ? '可用' : '不可用',
+            severity: result.is_available ? 'success' : 'danger',
+            rounded: true,
+          }),
+        ]),
+        result.balance_infos.length > 0
+          ? vnd(DataTable, {
+              value: result.balance_infos,
+              showGridlines: true,
+              // stripedRows: true,
+              size: 'small',
+            }, {
+              default: () => [
+                vnd(Column, { field: 'currency', header: '货币', style: { width: '25%' } }),
+                vnd(Column, { field: 'total_balance', header: '总额' }),
+                vnd(Column, { field: 'topped_up_balance', header: '充值' }),
+                vnd(Column, { field: 'granted_balance', header: '赠送' }),
+              ],
+            })
+          : vnd(Message, { severity: 'info' }, {
+              default: () => '无余额信息',
+            }),
+      ]);
+    };
+
     return () => vnd(Panel, {
       header: 'API Key 余额查询',
       toggleable: true,
       class: 'my-3',
     }, {
       default: () => [
+        // Add key toolbar
+        vnd(Toolbar, { class: 'mb-4 border-round' }, {
+          start: () => [
+            vnd('div', { class: 'flex flex-row flex-wrap gap-2' }, [
+              vnd(InputText, {
+                placeholder: '别名（如：我的主 Key）',
+                modelValue: newAlias.value,
+                'onUpdate:modelValue': (v: string) => { newAlias.value = v; },
+                onKeydown: handleKeydown,
+              }),
+              vnd(InputText, {
+                placeholder: 'DeepSeek API Key（sk-...）',
+                modelValue: newKey.value,
+                'onUpdate:modelValue': (v: string) => { newKey.value = v; },
+                onKeydown: handleKeydown,
+                style: { width: '320px' },
+              }),
+              vnd(Button, {
+                label: '添加',
+                icon: 'pi pi-plus',
+                onClick: addNewKey,
+              }),
+            ]),
+          ],
+        }),
 
-        // Add key form
-        vnd('div', { class: 'flex flex-row flex-items-center flex-wrap gap-2 mb-3 p-3 border-round bg-var-p-surface-ground' }, [
-          vnd(InputText, {
-            placeholder: '别名（如：我的主 Key）',
-            modelValue: newAlias.value,
-            'onUpdate:modelValue': (v: string) => { newAlias.value = v; },
-            onKeydown: handleKeydown,
-          }),
-          vnd(InputText, {
-            placeholder: 'DeepSeek API Key（sk-...）',
-            modelValue: newKey.value,
-            'onUpdate:modelValue': (v: string) => { newKey.value = v; },
-            onKeydown: handleKeydown,
-            style: { width: '300px' },
-          }),
-          vnd(Button, {
-            label: '添加',
-            icon: 'pi pi-plus',
-            onClick: addNewKey,
-          }),
-        ]),
-
-        // Keys list
+        // Empty state
         count.value === 0
-          ? vnd('div', { class: 'text-sm opacity-60 p-3' }, '暂无保存的 Key，请在上方添加')
-          : vnd('div', { class: 'stack-v gap-3' }, [
-              vnd('div', { class: 'text-sm opacity-70' }, `已保存 ${count.value} 个 Key`),
+          ? vnd(Message, { severity: 'info' }, {
+              default: () => '暂无保存的 Key，请在上方添加',
+            })
+          : [
+              vnd('div', { class: 'mb-3 flex flex-row flex-items-center gap-2' }, [
+                vnd('span', { class: 'font-semibold' }, '已保存的 Key'),
+                vnd(Badge, { value: count.value.toString(), severity: 'info', size: 'small' }),
+              ]),
 
               ...keys.value.map((entry: ApiKeyEntry) => {
                 const result = balanceResults[entry.id];
 
-                return vnd('div', {
+                return vnd(Card, {
                   key: `key-${entry.id}`,
-                  class: 'p-3 border-round surface-border border-1 flex flex-column gap-2',
-                }, [
-                  // Key header with actions
-                  vnd('div', { class: 'flex flex-row flex-items-center flex-justify-between' }, [
-                    vnd('div', { class: 'flex flex-row flex-items-center gap-2' }, [
-                      vnd('i', { class: 'pi pi-key' }),
-                      vnd('span', { class: 'font-bold' }, entry.alias),
-                      vnd('span', { class: 'text-sm opacity-60 font-mono' }, maskKey(entry.key)),
-                    ]),
-                    vnd('div', { class: 'flex flex-row gap-2' }, [
-                      vnd(Button, {
-                        label: result && !result.error ? '刷新' : '查询余额',
-                        icon: 'pi pi-search',
-                        size: 'small',
-                        loading: result?.loading,
-                        onClick: () => queryBalance(entry),
-                      }),
-                      vnd(Button, {
-                        icon: 'pi pi-trash',
-                        size: 'small',
-                        severity: 'danger',
-                        text: true,
-                        onClick: () => { removeKey(entry.id); delete balanceResults[entry.id]; },
-                      }),
-                    ]),
-                  ]),
+                  class: 'mb-3',
+                }, {
+                  content: () => {
+                    const children: any[] = [
+                      // Header row
+                      vnd('div', { class: 'flex flex-row flex-items-center gap-2' }, [
+                        vnd('i', { class: 'pi pi-key' }),
+                        vnd('span', { class: 'font-medium' }, entry.alias),
+                        vnd('span', { class: 'font-mono' }, maskKey(entry.key)),
+                        vnd(Button, {
+                          icon: 'pi pi-copy',
+                          severity: 'secondary',
+                          text: true,
+                          size: 'small',
+                          onClick: () => copyKey(entry.key),
+                        }),
 
-                  // Balance result
-                  result && !result.loading
-                    ? vnd('div', { class: 'mt-2 p-2 border-round surface-ground' }, [
-                        result.error
-                          ? vnd('div', { class: 'text-red-500 flex flex-row flex-items-center gap-2' }, [
-                              vnd('i', { class: 'pi pi-exclamation-circle' }),
-                              vnd('span', {}, `查询失败: ${result.error}`),
-                            ])
-                          : vnd('div', { class: 'stack-v gap-1' }, [
-                              vnd('div', { class: 'flex flex-row flex-items-center gap-2' }, [
-                                vnd('span', {}, '账户状态:'),
-                                vnd(Tag, {
-                                  value: result.is_available ? '可用' : '不可用',
-                                  severity: result.is_available ? 'success' : 'danger',
-                                }),
-                              ]),
-                              ...result.balance_infos.map((info) =>
-                                vnd('div', {
-                                  class: 'flex flex-row flex-items-center gap-3 text-sm',
-                                  key: info.currency,
-                                }, [
-                                  vnd('span', { class: 'font-bold w-3rem' }, info.currency),
-                                  vnd('span', {}, `总额: ${info.total_balance}`),
-                                  vnd('span', {}, `充值: ${info.topped_up_balance}`),
-                                  vnd('span', {}, `赠送: ${info.granted_balance}`),
-                                ])
-                              ),
-                            ]),
-                      ])
-                    : null,
-                ]);
+                        // Action buttons
+                        vnd('div', { class: 'flex flex-row gap-2 ml-auto' }, [
+                          vnd(Button, {
+                            label: result && !result.error ? '刷新余额' : '查询余额',
+                            icon: 'pi pi-refresh',
+                            size: 'small',
+                            outlined: true,
+                            loading: result?.loading,
+                            onClick: () => queryBalance(entry),
+                          }),
+                          vnd(Button, {
+                            icon: 'pi pi-trash',
+                            size: 'small',
+                            severity: 'danger',
+                            text: true,
+                            onClick: () => { removeKey(entry.id); delete balanceResults[entry.id]; },
+                          }),
+                        ]),
+                      ]),
+
+                      // Separator
+                      vnd('hr', { class: 'my-2 border-0 border-t-1 surface-border' }),
+
+                      // Last query time
+                      entry.lastQueryTime
+                        ? vnd('div', { class: 'my-0.75em flex flex-row flex-items-center gap-1' }, [
+                            vnd('i', { class: 'pi pi-clock' }),
+                            vnd('span', {}, `最后查询: ${new Date(entry.lastQueryTime).toLocaleString()}`),
+                          ])
+                        : null,
+
+                      // Balance result
+                      result ? renderBalanceCard(result) : null,
+                    ];
+
+                    return children.filter(Boolean);
+                  },
+                });
               }),
-            ]),
+            ],
       ],
     });
   },

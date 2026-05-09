@@ -7,6 +7,17 @@ export interface ApiKeyEntry {
   alias: string;
   key: string;
   timestamp: number;
+  lastBalanceResult?: {
+    is_available: boolean;
+    balance_infos: Array<{
+      currency: string;
+      total_balance: string;
+      topped_up_balance: string;
+      granted_balance: string;
+    }>;
+    error?: string;
+  };
+  lastQueryTime?: number;
 }
 
 export const useApiKeysStore = defineStore('apiKeysStore', {
