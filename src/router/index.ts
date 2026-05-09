@@ -10,6 +10,7 @@ import NotFoundView from '@views/NotFoundView';
 import AppView from '@views/AppView';
 import AppToolView from '@views/appViews/AppToolView';
 import AppNotesView from '@views/appViews/AppNotesView';
+import AppKeyBalanceView from '@views/appViews/AppKeyBalanceView';
 
 // const routes = [
 //   { path: '/:pathMatch(.*)*', name: '404', component: NotFoundView },
@@ -27,6 +28,7 @@ const routes = [
   { path: '/', name: 'app-root', component: AppView, children: [
     { path: 'tool', name: 'app-tool', component: AppToolView },
     { path: 'notes', name: 'app-notes', component: AppNotesView },
+    { path: 'key-balance', name: 'app-key-balance', component: AppKeyBalanceView },
   ] },
 ];
 

@@ -44,6 +44,7 @@ const AppView = defineComponent({
 
     const items = ref([
       { label: "token 计数器", name: "app-tool", icon: "pi pi-wrench" },
+      { label: "Key 余额", name: "app-key-balance", icon: "pi pi-dollar" },
       { label: "笔记", name: "app-notes", icon: "pi pi-clipboard" },
     ]);
     const currentLabelName = ref(items.value[0].label);
